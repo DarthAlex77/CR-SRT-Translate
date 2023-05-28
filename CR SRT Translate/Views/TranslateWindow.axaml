@@ -1,0 +1,18 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:viewModels="clr-namespace:CR_SRT_Translate.ViewModels"
+        Width="800" Height="450" CanResize="False"
+        x:Class="CR_SRT_Translate.Views.TranslateWindow"
+        Title="TranslateWindow" x:Name="Window">
+    <Window.DataContext>
+        <viewModels:TranslateWindowViewModel />
+    </Window.DataContext>
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,*">
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Оригинал" TextAlignment="Center" />
+        <TextBlock Grid.Row="0" Grid.Column="1" Text="Перевод" TextAlignment="Center" />
+        <TextBox Grid.Row="1" Grid.Column="0" Margin="5" Text="{Binding OriginalText,Mode=TwoWay}" TextWrapping="Wrap" />
+        <TextBox Grid.Row="1" Grid.Column="1" Margin="5" Text="{Binding TranslatedText,Mode=TwoWay}" TextWrapping="Wrap" />
+        <Button Grid.Row="2" Grid.ColumnSpan="2" Grid.Column="0" HorizontalAlignment="Center" Content="Сохранить" HorizontalContentAlignment="Center" Width="125" Margin="0,5"
+                Command="{Binding SaveCommand}" CommandParameter="{Binding ElementName=Window}" />
+    </Grid>
+</Window>
