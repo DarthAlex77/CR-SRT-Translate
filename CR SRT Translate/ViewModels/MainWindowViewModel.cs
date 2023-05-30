@@ -1,13 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
-using Avalonia.Collections;
+using System.Web;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -19,20 +22,52 @@ namespace CR_SRT_Translate.ViewModels
 {
     public class MainWindowViewModel : ObservableObject
     {
+        #region Bindable Properties
+
+        public ObservableCollection<Line> Lines { get; set; }
+
+        #endregion
+
+        #region Methods
+
+        private void Recalculate(Line line)
+        {
+            if (!line.TranslatedText.IsNullOrWhiteSpace())
+            {
+                List<Line>   sentenceLines = Lines.Where(x => x.SentenceIndex == line.SentenceIndex).ToList();
+                List<string> words         = string.Join(' ', sentenceLines.Select(x => x.TranslatedText)).Split(' ').ToList();
+                foreach (Line line1 in sentenceLines)
+                {
+                    line1.TranslatedText = string.Join(' ', words.Take(line1.NumberOfWords));
+                    try
+                    {
+                        words.RemoveRange(0, line1.NumberOfWords);
+                    }
+                    catch (ArgumentException)
+                    {
+                        words.Clear();
+                    }
+                    sentenceLines.Last().TranslatedText += " " + string.Join(" ", words);
+                }
+            }
+        }
+
+        #endregion
+
         #region Constructor
 
         public MainWindowViewModel()
         {
-            _canTranslate        =  false;
-            _canSave             =  false;
-            Lines                =  new ObservableCollection<Line>();
-            View                 =  new DataGridCollectionView(Lines);
-            View.PropertyChanged += View_PropertyChanged;
-            OpenSrtCommand       =  new RelayCommand<Window>(OpenSrt!);
-            OpenJsonCommand      =  new RelayCommand<Window>(OpenJson!);
-            SaveSrtCommand       =  new RelayCommand<Window>(SaveSrt!,   _ => _canSave);
-            SaveJsonCommand      =  new RelayCommand<Window>(SaveJson!,  _ => _canSave);
-            TranslateCommand     =  new RelayCommand<Window>(Translate!, _ => _canTranslate);
+            _canTranslate           =  false;
+            _canSave                =  false;
+            Lines                   =  new ObservableCollection<Line>();
+            Lines.CollectionChanged += Lines_CollectionChanged;
+            OpenSrtCommand          =  new RelayCommand<Window>(OpenSrt!);
+            OpenJsonCommand         =  new RelayCommand<Window>(OpenJson!);
+            SaveSrtCommand          =  new RelayCommand<Window>(SaveSrt!,   _ => _canSave);
+            SaveJsonCommand         =  new RelayCommand<Window>(SaveJson!,  _ => _canSave);
+            TranslateCommand        =  new RelayCommand<Window>(Translate!, _ => _canTranslate);
+            AutoCalcCommand         =  new RelayCommand(AutoCalc);
             WeakReferenceMessenger.Default.Register<string>(this, Receive);
 
             #region InitFileDialogFilters
@@ -57,95 +92,139 @@ namespace CR_SRT_Translate.ViewModels
             #endregion
         }
 
-        #endregion
-
-        #region Methods
-
-        private void View_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        private void Lines_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             if (Lines.Any())
             {
                 _canTranslate = true;
                 TranslateCommand.NotifyCanExecuteChanged();
-                if (Lines.Any(line => !line.TranslatedText.IsNullOrWhiteSpace()))
-                {
+            }
+        }
+
+        private void Line_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case "NumberOfWords":
+                    Recalculate((Line) sender);
+                    break;
+                case "TranslatedText" when Lines.Any(line => !line.TranslatedText.IsNullOrWhiteSpace()):
                     _canSave = true;
                     SaveSrtCommand.NotifyCanExecuteChanged();
                     SaveJsonCommand.NotifyCanExecuteChanged();
-                }
-                else
-                {
+                    break;
+                case "TranslatedText":
                     _canSave = false;
                     SaveSrtCommand.NotifyCanExecuteChanged();
                     SaveJsonCommand.NotifyCanExecuteChanged();
-                }
+                    break;
             }
-
-            if (View.CurrentEditItem != null)
-            {
-                _editingStarted = true;
-            }
-            if (_editingStarted && View.CurrentEditItem == null)
-            {
-                Recalculate((Line) View.CurrentItem);
-                _editingStarted = false;
-            }
-        }
-
-        private void Recalculate(Line line)
-        {
-            if (!line.TranslatedText.IsNullOrWhiteSpace())
-            {
-                List<Line>   sentenceLines = Lines.Where(x => x.SentenceIndex == line.SentenceIndex).ToList();
-                List<string> words         = string.Join(' ', sentenceLines.Select(x=>x.TranslatedText)).Split(' ').ToList();
-                foreach (Line line1 in sentenceLines)
-                {
-                    line1.TranslatedText = string.Join(' ', words.Take(line1.NumberOfWords));
-                    try
-                    {
-                        words.RemoveRange(0, line1.NumberOfWords);
-                    }
-                    catch (ArgumentException)
-                    {
-                        words.Clear();
-                    }
-                }
-            }
-        }
-
-        #endregion
-
-        #region Bindable Properties
-
-        public DataGridCollectionView View { get; set; }
-
-        public ObservableCollection<Line> Lines
-        {
-            get => _lines;
-            set => SetProperty(ref _lines, value);
         }
 
         #endregion
 
         #region Fields
 
-        private          bool                       _canTranslate;
-        private          bool                       _canSave;
-        private          bool                       _editingStarted;
-        private readonly List<FileDialogFilter>     _srtFilter;
-        private readonly List<FileDialogFilter>     _jsonFilter;
-        private          ObservableCollection<Line> _lines = null!;
-        private          string?                    _fileName;
+        private          bool                   _canTranslate;
+        private          bool                   _canSave;
+        private readonly List<FileDialogFilter> _srtFilter;
+        private readonly List<FileDialogFilter> _jsonFilter;
+        private          string?                _fileName;
 
         #endregion
 
         #region Commands
 
+        #region AutoCalcCommand
+
+        public RelayCommand AutoCalcCommand { get; set; }
+
+        public void AutoCalc()
+        {
+            string TranslateWord(string word)
+            {
+                const string toLanguage   = "ru";
+                const string fromLanguage = "en";
+                string       url          = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl={fromLanguage}&tl={toLanguage}&dt=t&q={HttpUtility.UrlEncode(word)}";
+                WebClient webClient = new WebClient
+                {
+                    Encoding = Encoding.UTF8
+                };
+                string result = webClient.DownloadString(url);
+                try
+                {
+                    result = result.Substring(4, result.IndexOf("\"", 4, StringComparison.Ordinal) - 4);
+                    return result;
+                }
+                catch
+                {
+                    return string.Empty;
+                }
+            }
+
+            List<int>    editedLines = new List<int>();
+            for (int index = 0; index < Lines.Count; index++)
+            {
+                List<string> words;
+                try
+                {
+                    words = string.Join(" ", new List<string?>{Lines[index].TranslatedText,Lines[index +1].TranslatedText}).Split(' ').ToList();
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    words = string.Join(" ",
+                                        new List<string?>
+                                        {
+                                            Lines[index].TranslatedText
+                                        }).Split(' ').ToList();
+                }
+                Line   line  = Lines[index];
+                if (line.IsOneLine == false)
+                {
+                    string last       = string.Join(' ', line.Text.Split(' ').TakeLast(2));
+                    string translated = TranslateWord(last);
+                    if (translated.Split(" ").Length>1)
+                    {
+                        foreach (string s in translated.Split(" "))
+                        {
+                            foreach (string word in words)
+                            {
+                                if (word.Contains(s))
+                                {
+                                    int i = words.IndexOf(word)+1;
+                                    line.NumberOfWords = i;
+                                    line.IsAutoEdited  = true;
+                                    editedLines.Add(line.LineIndex);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (string word in words)
+                        {
+                            if (word.Contains(translated))
+                            {
+                                int i = words.IndexOf(word) +1;
+                                line.NumberOfWords = i;
+                                line.IsAutoEdited  = true;
+                                editedLines.Add(line.LineIndex);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        #endregion
+
         #region OpenSrtCommand
 
         public RelayCommand<Window> OpenSrtCommand { get; set; }
 
-        public void OpenSrt(Window window)
+        public async void OpenSrt(Window window)
         {
             Lines.Clear();
             OpenFileDialog dialog = new OpenFileDialog
@@ -153,13 +232,15 @@ namespace CR_SRT_Translate.ViewModels
                 AllowMultiple = false,
                 Filters       = _srtFilter
             };
-            string path = dialog.ShowAsync(window).Result?[0] ?? string.Empty;
-            if (!path.IsNullOrWhiteSpace())
+            string[]? path = await dialog.ShowAsync(window);
+
+            if (path != null && path.Any())
             {
-                _fileName = path.Split("\\").Last().Split('.').First();
-                foreach (Line line in SrtEngine.ParseSrt(File.ReadAllText(path)))
+                _fileName = path[0].Split("\\").Last().Split('.').First();
+                foreach (Line line in SrtEngine.ParseSrt(await File.ReadAllTextAsync(path[0])))
                 {
                     Lines.Add(line);
+                    line.PropertyChanged += Line_PropertyChanged;
                 }
             }
         }
@@ -170,7 +251,7 @@ namespace CR_SRT_Translate.ViewModels
 
         public RelayCommand<Window> OpenJsonCommand { get; set; }
 
-        public void OpenJson(Window window)
+        public async void OpenJson(Window window)
         {
             Lines.Clear();
             OpenFileDialog dialog = new OpenFileDialog
@@ -178,11 +259,15 @@ namespace CR_SRT_Translate.ViewModels
                 AllowMultiple = false,
                 Filters       = _jsonFilter
             };
-            string path = dialog.ShowAsync(window).Result?[0] ?? string.Empty;
-            if (!path.IsNullOrWhiteSpace())
+            string[]? path = await dialog.ShowAsync(window);
+            if (path != null && path.Any())
             {
-                string json = File.ReadAllText(path);
-                Lines = (ObservableCollection<Line>) (JsonSerializer.Deserialize<ObservableCollection<Line>>(json) ?? Enumerable.Empty<Line>());
+                string json = await File.ReadAllTextAsync(path[0]);
+                foreach (Line line in JsonSerializer.Deserialize<IEnumerable<Line>>(json))
+                {
+                    Lines.Add(line);
+                    line.PropertyChanged += Line_PropertyChanged;
+                }
             }
         }
 
@@ -192,7 +277,7 @@ namespace CR_SRT_Translate.ViewModels
 
         public RelayCommand<Window> SaveSrtCommand { get; set; }
 
-        public void SaveSrt(Window window)
+        public async void SaveSrt(Window window)
         {
             SaveFileDialog dialog = new SaveFileDialog
             {
@@ -200,11 +285,11 @@ namespace CR_SRT_Translate.ViewModels
                 DefaultExtension = ".srt",
                 InitialFileName  = _fileName
             };
-            string path = dialog.ShowAsync(window).Result ?? string.Empty;
+            string path = await dialog.ShowAsync(window) ?? string.Empty;
             if (!path.IsNullOrWhiteSpace())
             {
                 string srt = SrtEngine.WriteSrt(Lines);
-                File.WriteAllText(path!, srt);
+                await File.WriteAllTextAsync(path!, srt);
             }
         }
 
@@ -214,14 +299,14 @@ namespace CR_SRT_Translate.ViewModels
 
         public RelayCommand<Window> SaveJsonCommand { get; set; }
 
-        public void SaveJson(Window window)
+        public async void SaveJson(Window window)
         {
             SaveFileDialog dialog = new SaveFileDialog
             {
                 Filters          = _jsonFilter,
                 DefaultExtension = ".json"
             };
-            string path = dialog.ShowAsync(window).Result ?? string.Empty;
+            string path = await dialog.ShowAsync(window) ?? string.Empty;
             if (!path.IsNullOrWhiteSpace())
             {
                 string json = JsonSerializer.Serialize(Lines,
@@ -230,7 +315,7 @@ namespace CR_SRT_Translate.ViewModels
                                                            Encoder       = JavaScriptEncoder.Create(UnicodeRanges.BasicLatin, UnicodeRanges.Cyrillic),
                                                            WriteIndented = true
                                                        });
-                File.WriteAllText(path, json);
+                await File.WriteAllTextAsync(path, json);
             }
         }
 
@@ -265,6 +350,7 @@ namespace CR_SRT_Translate.ViewModels
                         words.Clear();
                     }
                 }
+                line.Last().TranslatedText += " " + string.Join(" ", words);
             }
         }
 

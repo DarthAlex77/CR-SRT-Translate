@@ -19,12 +19,14 @@
             <MenuItem Header="Сохранить SRT" Command="{Binding SaveSrtCommand}" CommandParameter="{ Binding ElementName=Window}" />
             <MenuItem Header="Сохранить JSON" Command="{Binding SaveJsonCommand}" CommandParameter="{ Binding ElementName=Window}" />
             <MenuItem Header="Перевести" Command="{Binding TranslateCommand}" CommandParameter="{ Binding ElementName=Window}"/>
+            <MenuItem Header="AutoCalc" Command="{Binding AutoCalcCommand}"/>
         </Menu>
-        <DataGrid Grid.Row="1" Items="{Binding View}" AutoGenerateColumns="False" CanUserResizeColumns="True">
+        <DataGrid Grid.Row="1" Items="{Binding Lines}" AutoGenerateColumns="False" CanUserResizeColumns="True">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Line" Binding="{Binding LineIndex}" IsReadOnly="True" CanUserSort="True"/>
                 <!--<DataGridTextColumn Header="Sentence" Binding="{Binding SentenceIndex}" IsReadOnly="True" CanUserSort="False"/>-->
-                <DataGridCheckBoxColumn Header="OneLine" Binding="{Binding IsOneLine}" IsReadOnly="True"/>
+                <DataGridCheckBoxColumn Header="IsOneLine" Binding="{Binding IsOneLine}" IsReadOnly="True"/>
+                <DataGridCheckBoxColumn Header="IsAutoEdited" Binding="{Binding IsAutoEdited}" IsReadOnly="True"/>
                 <!--<DataGridTextColumn Header="Start" Binding="{Binding StartTime, Converter={StaticResource Converter}}"  IsReadOnly="True" CanUserSort="False"/>
                 <DataGridTextColumn Header="End" Binding="{Binding EndTime, Converter={StaticResource Converter}}" IsReadOnly="True" CanUserSort="False"/>-->
                 <DataGridTextColumn Header="Text" Binding="{Binding Text}" IsReadOnly="True" CanUserSort="False"/>

@@ -7,6 +7,7 @@ namespace CR_SRT_Translate.Models
     {
         private int    _numberOfWords;
         private string _translatedText;
+        private bool   _isAutoEdited;
 
         public Line()
         { }
@@ -29,6 +30,11 @@ namespace CR_SRT_Translate.Models
         public TimeSpan StartTime     { get; set; }
         public TimeSpan EndTime       { get; set; }
         public string   Text          { get; set; }
+        public bool IsAutoEdited
+        {
+            get => _isAutoEdited;
+            set => SetProperty(ref _isAutoEdited, value);
+        }
         public string TranslatedText
         {
             get => _translatedText;
