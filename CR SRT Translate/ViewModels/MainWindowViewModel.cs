@@ -1,16 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Unicode;
-using System.Web;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -28,32 +24,6 @@ namespace CR_SRT_Translate.ViewModels
 
         #endregion
 
-        #region Methods
-
-        private void Recalculate(Line line)
-        {
-            if (!line.TranslatedText.IsNullOrWhiteSpace())
-            {
-                List<Line>   sentenceLines = Lines.Where(x => x.SentenceIndex == line.SentenceIndex).ToList();
-                List<string> words         = string.Join(' ', sentenceLines.Select(x => x.TranslatedText)).Split(' ').ToList();
-                foreach (Line line1 in sentenceLines)
-                {
-                    line1.TranslatedText = string.Join(' ', words.Take(line1.NumberOfWords));
-                    try
-                    {
-                        words.RemoveRange(0, line1.NumberOfWords);
-                    }
-                    catch (ArgumentException)
-                    {
-                        words.Clear();
-                    }
-                    sentenceLines.Last().TranslatedText += " " + string.Join(" ", words);
-                }
-            }
-        }
-
-        #endregion
-
         #region Constructor
 
         public MainWindowViewModel()
@@ -67,7 +37,6 @@ namespace CR_SRT_Translate.ViewModels
             SaveSrtCommand          =  new RelayCommand<Window>(SaveSrt!,   _ => _canSave);
             SaveJsonCommand         =  new RelayCommand<Window>(SaveJson!,  _ => _canSave);
             TranslateCommand        =  new RelayCommand<Window>(Translate!, _ => _canTranslate);
-            AutoCalcCommand         =  new RelayCommand(AutoCalc);
             WeakReferenceMessenger.Default.Register<string>(this, Receive);
 
             #region InitFileDialogFilters
@@ -105,9 +74,6 @@ namespace CR_SRT_Translate.ViewModels
         {
             switch (e.PropertyName)
             {
-                case "NumberOfWords":
-                    Recalculate((Line) sender);
-                    break;
                 case "TranslatedText" when Lines.Any(line => !line.TranslatedText.IsNullOrWhiteSpace()):
                     _canSave = true;
                     SaveSrtCommand.NotifyCanExecuteChanged();
@@ -134,91 +100,6 @@ namespace CR_SRT_Translate.ViewModels
         #endregion
 
         #region Commands
-
-        #region AutoCalcCommand
-
-        public RelayCommand AutoCalcCommand { get; set; }
-
-        public void AutoCalc()
-        {
-            string TranslateWord(string word)
-            {
-                const string toLanguage   = "ru";
-                const string fromLanguage = "en";
-                string       url          = $"https://translate.googleapis.com/translate_a/single?client=gtx&sl={fromLanguage}&tl={toLanguage}&dt=t&q={HttpUtility.UrlEncode(word)}";
-                WebClient webClient = new WebClient
-                {
-                    Encoding = Encoding.UTF8
-                };
-                string result = webClient.DownloadString(url);
-                try
-                {
-                    result = result.Substring(4, result.IndexOf("\"", 4, StringComparison.Ordinal) - 4);
-                    return result;
-                }
-                catch
-                {
-                    return string.Empty;
-                }
-            }
-
-            List<int>    editedLines = new List<int>();
-            for (int index = 0; index < Lines.Count; index++)
-            {
-                List<string> words;
-                try
-                {
-                    words = string.Join(" ", new List<string?>{Lines[index].TranslatedText,Lines[index +1].TranslatedText}).Split(' ').ToList();
-                }
-                catch (ArgumentOutOfRangeException e)
-                {
-                    words = string.Join(" ",
-                                        new List<string?>
-                                        {
-                                            Lines[index].TranslatedText
-                                        }).Split(' ').ToList();
-                }
-                Line   line  = Lines[index];
-                if (line.IsOneLine == false)
-                {
-                    string last       = string.Join(' ', line.Text.Split(' ').TakeLast(2));
-                    string translated = TranslateWord(last);
-                    if (translated.Split(" ").Length>1)
-                    {
-                        foreach (string s in translated.Split(" "))
-                        {
-                            foreach (string word in words)
-                            {
-                                if (word.Contains(s))
-                                {
-                                    int i = words.IndexOf(word)+1;
-                                    line.NumberOfWords = i;
-                                    line.IsAutoEdited  = true;
-                                    editedLines.Add(line.LineIndex);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        foreach (string word in words)
-                        {
-                            if (word.Contains(translated))
-                            {
-                                int i = words.IndexOf(word) +1;
-                                line.NumberOfWords = i;
-                                line.IsAutoEdited  = true;
-                                editedLines.Add(line.LineIndex);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        #endregion
 
         #region OpenSrtCommand
 
@@ -263,7 +144,7 @@ namespace CR_SRT_Translate.ViewModels
             if (path != null && path.Any())
             {
                 string json = await File.ReadAllTextAsync(path[0]);
-                foreach (Line line in JsonSerializer.Deserialize<IEnumerable<Line>>(json))
+                foreach (Line line in JsonSerializer.Deserialize<IEnumerable<Line>>(json)!)
                 {
                     Lines.Add(line);
                     line.PropertyChanged += Line_PropertyChanged;
@@ -289,7 +170,7 @@ namespace CR_SRT_Translate.ViewModels
             if (!path.IsNullOrWhiteSpace())
             {
                 string srt = SrtEngine.WriteSrt(Lines);
-                await File.WriteAllTextAsync(path!, srt);
+                await File.WriteAllTextAsync(path, srt);
             }
         }
 
@@ -333,24 +214,10 @@ namespace CR_SRT_Translate.ViewModels
 
         private void Receive(object recipient, string message)
         {
-            List<string>     sentences = message.Replace('\r', ' ').Split('\n').ToList();
-            List<List<Line>> lines     = Lines.GroupBy(x => x.SentenceIndex).Select(x => x.ToList()).ToList();
-            foreach (List<Line> line in lines)
+            List<string?> translatedLines = message.Split('\n').ToList()!;
+            for (int index = 0; index < Lines.Count; index++)
             {
-                List<string> words = sentences[line.First().SentenceIndex - 1].Split(' ').ToList();
-                foreach (Line line1 in line)
-                {
-                    line1.TranslatedText = string.Join(' ', words.Take(line1.NumberOfWords));
-                    try
-                    {
-                        words.RemoveRange(0, line1.NumberOfWords);
-                    }
-                    catch (ArgumentException)
-                    {
-                        words.Clear();
-                    }
-                }
-                line.Last().TranslatedText += " " + string.Join(" ", words);
+                Lines[index].TranslatedText = translatedLines[index]!;
             }
         }
 

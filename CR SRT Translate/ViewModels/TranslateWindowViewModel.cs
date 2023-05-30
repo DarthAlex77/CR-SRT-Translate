@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Text;
 using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -19,33 +18,20 @@ namespace CR_SRT_Translate.ViewModels
             WeakReferenceMessenger.Default.Register<ObservableCollection<Line>>(this, Receive);
             OriginalText   = string.Empty;
             TranslatedText = string.Empty;
-
         }
+
         #endregion
 
         #region Methods
 
         private void Receive(object recipient, ObservableCollection<Line> message)
         {
-            int           sentenceIndex = 1;
-            List<string>  sentences     = new List<string>();
-            StringBuilder builder       = new StringBuilder();
+            StringBuilder builder = new StringBuilder();
             foreach (Line line in message)
             {
-                if (line.SentenceIndex != sentenceIndex)
-                {
-                    sentences.Add(builder.ToString());
-                    sentenceIndex++;
-                    builder.Clear();
-                    builder.AppendJoin(' ', line.Text.ReplaceLineEndings(" "));
-                }
-                else
-                {
-                    builder.AppendJoin(' ', line.Text.ReplaceLineEndings(" "));
-                }
+                builder.AppendLine(line.Text.Replace('\n', ' ').Replace('\r', ' '));
             }
-            sentences.Add(builder.ToString());
-            OriginalText = string.Join('\n', sentences);
+            OriginalText = builder.ToString();
         }
 
         #endregion
