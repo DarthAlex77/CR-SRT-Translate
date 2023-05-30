@@ -1,37 +1,27 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:CR_SRT_Translate.ViewModels" 
-        xmlns:models="clr-namespace:CR_SRT_Translate.Models"
+        xmlns:vm="using:CR_SRT_Translate.ViewModels"
         x:Class="CR_SRT_Translate.Views.MainWindow"
-        Icon="/Assets/avalonia-logo.ico"
         x:Name="Window"
         Title="CR_SRT_Translate">
     <Window.DataContext>
         <vm:MainWindowViewModel />
     </Window.DataContext>
-    <Window.Resources>
-        <models:TimeFormatConverter x:Key="Converter"/>
-    </Window.Resources>
     <Grid RowDefinitions="Auto,*">
         <Menu Grid.Row="0">
             <MenuItem Header="Открыть SRT" Command="{Binding OpenSrtCommand}" CommandParameter="{ Binding ElementName=Window}" />
             <MenuItem Header="Открыть JSON" Command="{Binding OpenJsonCommand}" CommandParameter="{ Binding ElementName=Window}" />
             <MenuItem Header="Сохранить SRT" Command="{Binding SaveSrtCommand}" CommandParameter="{ Binding ElementName=Window}" />
             <MenuItem Header="Сохранить JSON" Command="{Binding SaveJsonCommand}" CommandParameter="{ Binding ElementName=Window}" />
-            <MenuItem Header="Перевести" Command="{Binding TranslateCommand}" CommandParameter="{ Binding ElementName=Window}"/>
-            <MenuItem Header="AutoCalc" Command="{Binding AutoCalcCommand}"/>
+            <MenuItem Header="Перевести" Command="{Binding TranslateCommand}" CommandParameter="{ Binding ElementName=Window}" />
         </Menu>
         <DataGrid Grid.Row="1" Items="{Binding Lines}" AutoGenerateColumns="False" CanUserResizeColumns="True">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Line" Binding="{Binding LineIndex}" IsReadOnly="True" CanUserSort="True"/>
-                <!--<DataGridTextColumn Header="Sentence" Binding="{Binding SentenceIndex}" IsReadOnly="True" CanUserSort="False"/>-->
-                <DataGridCheckBoxColumn Header="IsOneLine" Binding="{Binding IsOneLine}" IsReadOnly="True"/>
-                <DataGridCheckBoxColumn Header="IsAutoEdited" Binding="{Binding IsAutoEdited}" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Line" Binding="{Binding LineIndex}" IsReadOnly="True" CanUserSort="True" />
                 <!--<DataGridTextColumn Header="Start" Binding="{Binding StartTime, Converter={StaticResource Converter}}"  IsReadOnly="True" CanUserSort="False"/>
                 <DataGridTextColumn Header="End" Binding="{Binding EndTime, Converter={StaticResource Converter}}" IsReadOnly="True" CanUserSort="False"/>-->
-                <DataGridTextColumn Header="Text" Binding="{Binding Text}" IsReadOnly="True" CanUserSort="False"/>
-                <DataGridTextColumn Header="Translated" Binding="{Binding TranslatedText}" CanUserSort="False"/>
-                <DataGridTextColumn Header="NumberOfWords" Binding="{Binding NumberOfWords}" CanUserSort="False"/>
+                <DataGridTextColumn Header="Text" Binding="{Binding Text}" IsReadOnly="True" CanUserSort="False" />
+                <DataGridTextColumn Header="Translated" Binding="{Binding TranslatedText}" CanUserSort="False" />
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

@@ -6,7 +6,7 @@ using CR_SRT_Translate.Views;
 
 namespace CR_SRT_Translate
 {
-    public partial class App : Application
+    public class App : Application
     {
         public override void Initialize()
         {
@@ -19,7 +19,7 @@ namespace CR_SRT_Translate
             {
                 desktop.MainWindow = new MainWindow
                 {
-                    DataContext = new MainWindowViewModel(),
+                    DataContext = new MainWindowViewModel()
                 };
             }
 
